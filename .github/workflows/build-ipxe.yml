@@ -1,0 +1,93 @@
+name: Build iPXE Binaries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'third_party/ipxe/**'
+      - 'pixiecore/boot.ipxe'
+      - '.github/workflows/build-ipxe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up build environment
+        run: |
+          mkdir -p ipxe/bin
+
+      - name: Build iPXE binaries (non-EFI)
+        run: |
+          docker run --rm --user $(id -u):$(id -g) \
+            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
+            gcc:7 \
+            make EMBED=/netboot/pixiecore/boot.ipxe \
+            bin/ipxe.pxe \
+            bin/undionly.kpxe
+
+      - name: Build iPXE binaries (x64 EFI)
+        run: |
+          docker run --rm --user $(id -u):$(id -g) \
+            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
+            gcc:7 \
+            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=1592432128 \
+            bin-x86_64-efi/ipxe.efi
+
+      - name: Build iPXE binaries (i386 EFI)
+        run: |
+          docker run --rm --user $(id -u):$(id -g) \
+            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
+            gcc:7 \
+            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=1592432205 \
+            bin-i386-efi/ipxe.efi
+
+      - name: Copy binaries to destination
+        run: |
+          cp third_party/ipxe/src/bin/ipxe.pxe ipxe/bin/
+          cp third_party/ipxe/src/bin/undionly.kpxe ipxe/bin/
+          cp third_party/ipxe/src/bin-x86_64-efi/ipxe.efi ipxe/bin/ipxe-x64.efi
+          cp third_party/ipxe/src/bin-i386-efi/ipxe.efi ipxe/bin/ipxe-i386.efi
+
+      - name: Display checksums
+        run: |
+          sha256sum ipxe/bin/*
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet ipxe/bin/; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in built binaries"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in built binaries"
+            git diff --stat ipxe/bin/
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git add ipxe/bin/
+          git commit -m "Update iPXE binaries
+
+          Built with gcc:7 using BUILD_TIMESTAMP for EFI binaries.
+
+          Source commit: ${{ github.sha }}
+          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push
