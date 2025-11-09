@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -63,6 +65,15 @@ jobs:
       - name: Display checksums
         run: |
           sha256sum ipxe/bin/*
+
+      - name: Generate SLSA provenance attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            ipxe/bin/ipxe-i386.efi
+            ipxe/bin/ipxe.pxe
+            ipxe/bin/ipxe-x64.efi
+            ipxe/bin/undionly.kpxe
 
       - name: Check for changes
         id: check_changes
