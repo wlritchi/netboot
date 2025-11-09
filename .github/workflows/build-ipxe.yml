@@ -30,29 +30,28 @@ jobs:
         run: |
           mkdir -p ipxe/bin
 
-      - name: Build iPXE binaries (non-EFI)
+      - name: Calculate build timestamp
+        id: timestamp
+        run: |
+          IPXE_TIMESTAMP=$(git -C third_party/ipxe log -1 --format=%ct)
+          CONFIG_TIMESTAMP=$(git log -1 --format=%ct -- pixiecore/boot.ipxe)
+          if [ "$IPXE_TIMESTAMP" -gt "$CONFIG_TIMESTAMP" ]; then
+            BUILD_TIMESTAMP=$IPXE_TIMESTAMP
+          else
+            BUILD_TIMESTAMP=$CONFIG_TIMESTAMP
+          fi
+          echo "timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "Using build timestamp: $BUILD_TIMESTAMP"
+
+      - name: Build iPXE binaries
         run: |
           docker run --rm --user $(id -u):$(id -g) \
             -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
             gcc:7 \
-            make EMBED=/netboot/pixiecore/boot.ipxe \
+            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }} \
             bin/ipxe.pxe \
-            bin/undionly.kpxe
-
-      - name: Build iPXE binaries (x64 EFI)
-        run: |
-          docker run --rm --user $(id -u):$(id -g) \
-            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
-            gcc:7 \
-            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=1592432128 \
-            bin-x86_64-efi/ipxe.efi
-
-      - name: Build iPXE binaries (i386 EFI)
-        run: |
-          docker run --rm --user $(id -u):$(id -g) \
-            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
-            gcc:7 \
-            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=1592432205 \
+            bin/undionly.kpxe \
+            bin-x86_64-efi/ipxe.efi \
             bin-i386-efi/ipxe.efi
 
       - name: Copy binaries to destination
@@ -96,7 +95,8 @@ jobs:
           git add ipxe/bin/
           git commit -m "Update iPXE binaries
 
-          Built with gcc:7 using BUILD_TIMESTAMP for EFI binaries.
+          Built with gcc:7 using BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
+          (derived from the later of iPXE submodule commit and boot.ipxe modification time).
 
           Source commit: ${{ github.sha }}
           Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
