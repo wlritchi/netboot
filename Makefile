@@ -54,9 +54,8 @@ update-ipxe:
 	bin/undionly.kpxe \
 	bin-x86_64-efi/ipxe.efi \
 	bin-i386-efi/ipxe.efi
-	go-bindata -o out/ipxe/bindata.go -pkg ipxe -nometadata -nomemcopy \
-	third_party/ipxe/src/bin/ipxe.pxe \
-	third_party/ipxe/src/bin/undionly.kpxe \
-	third_party/ipxe/src/bin-x86_64-efi/ipxe.efi \
-	third_party/ipxe/src/bin-i386-efi/ipxe.efi
-	gofmt -s -w out/ipxe/bindata.go
+	mkdir -p ipxe/bin
+	cp third_party/ipxe/src/bin/ipxe.pxe ipxe/bin/
+	cp third_party/ipxe/src/bin/undionly.kpxe ipxe/bin/
+	cp third_party/ipxe/src/bin-x86_64-efi/ipxe.efi ipxe/bin/ipxe-x64.efi
+	cp third_party/ipxe/src/bin-i386-efi/ipxe.efi ipxe/bin/ipxe-i386.efi

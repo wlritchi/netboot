@@ -15,7 +15,7 @@
 package main
 
 import (
-	"go.universe.tf/netboot/out/ipxe"
+	"go.universe.tf/netboot/ipxe"
 	"go.universe.tf/netboot/pixiecore"
 	"go.universe.tf/netboot/pixiecore/cli"
 )
