@@ -46,17 +46,23 @@ ci-push-images:
 ci-config:
 	(cd .circleci && go run gen-config.go >config.yml)
 
+IPXE_BUILD_ARGS = EMBED=$(HERE)/pixiecore/boot.ipxe $(if $(BUILD_TIMESTAMP),BUILD_TIMESTAMP=$(BUILD_TIMESTAMP))
+
 .PHONY: update-ipxe
 update-ipxe:
 	$(MAKE) -C third_party/ipxe/src \
-	EMBED=$(HERE)/pixiecore/boot.ipxe \
-	$(if $(BUILD_TIMESTAMP),BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)) \
+	$(IPXE_BUILD_ARGS) \
 	bin/ipxe.pxe \
 	bin/undionly.kpxe \
 	bin-x86_64-efi/ipxe.efi \
 	bin-i386-efi/ipxe.efi
+	$(MAKE) -C third_party/ipxe/src \
+	CROSS=aarch64-linux-gnu- \
+	$(IPXE_BUILD_ARGS) \
+	bin-arm64-efi/snp.efi
 	mkdir -p ipxe/bin
 	cp third_party/ipxe/src/bin/ipxe.pxe ipxe/bin/
 	cp third_party/ipxe/src/bin/undionly.kpxe ipxe/bin/
 	cp third_party/ipxe/src/bin-x86_64-efi/ipxe.efi ipxe/bin/ipxe-x64.efi
 	cp third_party/ipxe/src/bin-i386-efi/ipxe.efi ipxe/bin/ipxe-i386.efi
+	cp third_party/ipxe/src/bin-arm64-efi/snp.efi ipxe/bin/snp-arm64.efi

@@ -18,11 +18,15 @@ var ipxeEfiX64 []byte
 //go:embed bin/ipxe-i386.efi
 var ipxeEfi32 []byte
 
+//go:embed bin/snp-arm64.efi
+var snpArm64 []byte
+
 var assets = map[string][]byte{
 	"third_party/ipxe/src/bin/ipxe.pxe":            ipxePxe,
 	"third_party/ipxe/src/bin/undionly.kpxe":       undionly,
 	"third_party/ipxe/src/bin-x86_64-efi/ipxe.efi": ipxeEfiX64,
 	"third_party/ipxe/src/bin-i386-efi/ipxe.efi":   ipxeEfi32,
+	"third_party/ipxe/src/bin-arm64-efi/snp.efi":   snpArm64,
 }
 
 // Asset loads and returns the asset for the given name.

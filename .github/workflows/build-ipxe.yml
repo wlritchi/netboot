@@ -58,6 +58,7 @@ jobs:
             ipxe/bin/ipxe.pxe
             ipxe/bin/ipxe-x64.efi
             ipxe/bin/undionly.kpxe
+            ipxe/bin/snp-arm64.efi
 
       - name: Check for changes
         id: check_changes
