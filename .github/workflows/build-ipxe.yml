@@ -47,7 +47,7 @@ jobs:
         run: |
           docker run --rm --user $(id -u):$(id -g) \
             -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
-            gcc:7 \
+            gcc:15 \
             make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }} \
             bin/ipxe.pxe \
             bin/undionly.kpxe \
@@ -95,7 +95,7 @@ jobs:
           git add ipxe/bin/
           git commit -m "Update iPXE binaries
 
-          Built with gcc:7 using BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
+          Built with gcc:15 using BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
           (derived from the later of iPXE submodule commit and boot.ipxe modification time).
 
           Source commit: ${{ github.sha }}
