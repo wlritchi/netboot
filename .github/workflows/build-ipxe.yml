@@ -26,10 +26,6 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up build environment
-        run: |
-          mkdir -p ipxe/bin
-
       - name: Calculate build timestamp
         id: timestamp
         run: |
@@ -46,20 +42,9 @@ jobs:
       - name: Build iPXE binaries
         run: |
           docker run --rm --user $(id -u):$(id -g) \
-            -v ${{ github.workspace }}:/netboot -w /netboot/third_party/ipxe/src \
+            -v ${{ github.workspace }}:/netboot -w /netboot \
             gcc:15 \
-            make EMBED=/netboot/pixiecore/boot.ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }} \
-            bin/ipxe.pxe \
-            bin/undionly.kpxe \
-            bin-x86_64-efi/ipxe.efi \
-            bin-i386-efi/ipxe.efi
-
-      - name: Copy binaries to destination
-        run: |
-          cp third_party/ipxe/src/bin/ipxe.pxe ipxe/bin/
-          cp third_party/ipxe/src/bin/undionly.kpxe ipxe/bin/
-          cp third_party/ipxe/src/bin-x86_64-efi/ipxe.efi ipxe/bin/ipxe-x64.efi
-          cp third_party/ipxe/src/bin-i386-efi/ipxe.efi ipxe/bin/ipxe-i386.efi
+            make update-ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
 
       - name: Display checksums
         run: |

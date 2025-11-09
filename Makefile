@@ -50,6 +50,7 @@ ci-config:
 update-ipxe:
 	$(MAKE) -C third_party/ipxe/src \
 	EMBED=$(HERE)/pixiecore/boot.ipxe \
+	$(if $(BUILD_TIMESTAMP),BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)) \
 	bin/ipxe.pxe \
 	bin/undionly.kpxe \
 	bin-x86_64-efi/ipxe.efi \
