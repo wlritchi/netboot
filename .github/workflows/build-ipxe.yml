@@ -41,10 +41,14 @@ jobs:
 
       - name: Build iPXE binaries
         run: |
-          docker run --rm --user $(id -u):$(id -g) \
+          docker run --rm \
             -v ${{ github.workspace }}:/netboot -w /netboot \
             gcc:15 \
-            make update-ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
+            bash -c 'apt-get update && apt-get install -y crossbuild-essential-arm64 && \
+              git config --global --add safe.directory /netboot && \
+              git config --global --add safe.directory /netboot/third_party/ipxe && \
+              make update-ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}'
+          sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/ipxe/bin
 
       - name: Display checksums
         run: |
