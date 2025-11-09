@@ -70,19 +70,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet ipxe/bin/; then
+          git add ipxe/bin/
+          if git diff --cached --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes detected in built binaries"
           else
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "Changes detected in built binaries"
-            git diff --stat ipxe/bin/
+            git diff --cached --stat
           fi
 
       - name: Commit and push changes
         if: steps.check_changes.outputs.changed == 'true'
         run: |
-          git add ipxe/bin/
           git commit -m "Update iPXE binaries
 
           Built with gcc:15 using BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
