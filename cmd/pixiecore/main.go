@@ -21,11 +21,10 @@ import (
 )
 
 func main() {
-
-	cli.Ipxe[pixiecore.FirmwareX86PC] = ipxe.MustAsset("third_party/ipxe/src/bin/undionly.kpxe")
-	cli.Ipxe[pixiecore.FirmwareEFI32] = ipxe.MustAsset("third_party/ipxe/src/bin-i386-efi/ipxe.efi")
-	cli.Ipxe[pixiecore.FirmwareEFI64] = ipxe.MustAsset("third_party/ipxe/src/bin-x86_64-efi/ipxe.efi")
-	cli.Ipxe[pixiecore.FirmwareEFIBC] = ipxe.MustAsset("third_party/ipxe/src/bin-x86_64-efi/ipxe.efi")
-	cli.Ipxe[pixiecore.FirmwareX86Ipxe] = ipxe.MustAsset("third_party/ipxe/src/bin/ipxe.pxe")
+	cli.Ipxe[pixiecore.FirmwareX86PC] = ipxe.Undionly
+	cli.Ipxe[pixiecore.FirmwareEFI32] = ipxe.IpxeEfi32
+	cli.Ipxe[pixiecore.FirmwareEFI64] = ipxe.IpxeEfiX64
+	cli.Ipxe[pixiecore.FirmwareEFIBC] = ipxe.IpxeEfiX64
+	cli.Ipxe[pixiecore.FirmwareX86Ipxe] = ipxe.IpxePxe
 	cli.CLI()
 }
