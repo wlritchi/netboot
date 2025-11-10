@@ -51,6 +51,8 @@ const (
 	ArchIA32 Architecture = iota
 	// ArchX64 is a 64-bit x86 machine (aka amd64 aka X64).
 	ArchX64
+	// ArchARM64 is a 64-bit ARM machine (aka aarch64).
+	ArchARM64
 )
 
 func (a Architecture) String() string {
@@ -59,6 +61,8 @@ func (a Architecture) String() string {
 		return "IA32"
 	case ArchX64:
 		return "X64"
+	case ArchARM64:
+		return "ARM64"
 	default:
 		return "Unknown architecture"
 	}
@@ -149,6 +153,7 @@ const (
 	FirmwareEFIBC                         // 64-bit x86 processor running EFI
 	FirmwareX86Ipxe                       // "Classic" x86 BIOS running iPXE (no UNDI support)
 	FirmwarePixiecoreIpxe                 // Pixiecore's iPXE, which has replaced the underlying firmware
+	FirmwareARM64EFI                      // 64-bit ARM processor running EFI
 )
 
 // A Server boots machines using a Booter.
