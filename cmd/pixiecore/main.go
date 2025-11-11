@@ -24,7 +24,6 @@ func main() {
 	cli.Ipxe[pixiecore.FirmwareX86PC] = ipxe.Undionly
 	cli.Ipxe[pixiecore.FirmwareEFI32] = ipxe.IpxeEfi32
 	cli.Ipxe[pixiecore.FirmwareEFI64] = ipxe.IpxeEfiX64
-	cli.Ipxe[pixiecore.FirmwareEFIBC] = ipxe.IpxeEfiX64
 	cli.Ipxe[pixiecore.FirmwareX86Ipxe] = ipxe.IpxePxe
 	cli.Ipxe[pixiecore.FirmwareARM64EFI] = ipxe.SnpArm64
 	cli.CLI()

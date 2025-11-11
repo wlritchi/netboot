@@ -109,13 +109,14 @@ func (s *Server) validateDHCP(pkt *dhcp4.Packet) (mach Machine, fwtype Firmware,
 	case 6:
 		mach.Arch = ArchIA32
 		fwtype = FirmwareEFI32
-	case 7:
+	case 7, 9:
+		// Type 7 and 9 are both x64 EFI variants (standards disagree on details)
+		// Both accept the same x64 EFI binary
 		mach.Arch = ArchX64
 		fwtype = FirmwareEFI64
-	case 9:
-		mach.Arch = ArchX64
-		fwtype = FirmwareEFIBC
-	case 11:
+	case 11, 19:
+		// Type 11 and 19 are both ARM64 EFI variants (regular and HTTP boot)
+		// Both accept the same ARM64 EFI binary
 		mach.Arch = ArchARM64
 		fwtype = FirmwareARM64EFI
 	default:
@@ -224,7 +225,7 @@ func (s *Server) offerDHCP(pkt *dhcp4.Packet, mach Machine, serverIP net.IP, fwt
 		resp.Options[43] = bs
 		resp.BootFilename = fmt.Sprintf("tftp://%s/%s/%d", serverIP, mach.MAC, fwtype)
 
-	case FirmwareEFI32, FirmwareEFI64, FirmwareEFIBC, FirmwareARM64EFI:
+	case FirmwareEFI32, FirmwareEFI64, FirmwareARM64EFI:
 		// In theory, the response we send for FirmwareX86PC should
 		// also work for EFI. However, some UEFI firmwares don't
 		// support PXE properly, and will ignore ProxyDHCP responses

@@ -150,7 +150,6 @@ const (
 	FirmwareX86PC         Firmware = iota // "Classic" x86 BIOS with PXE/UNDI support
 	FirmwareEFI32                         // 32-bit x86 processor running EFI
 	FirmwareEFI64                         // 64-bit x86 processor running EFI
-	FirmwareEFIBC                         // 64-bit x86 processor running EFI
 	FirmwareX86Ipxe                       // "Classic" x86 BIOS running iPXE (no UNDI support)
 	FirmwarePixiecoreIpxe                 // Pixiecore's iPXE, which has replaced the underlying firmware
 	FirmwareARM64EFI                      // 64-bit ARM processor running EFI

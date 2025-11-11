@@ -99,11 +99,11 @@ func (s *Server) validatePXE(pkt *dhcp4.Packet) (fwtype Firmware, err error) {
 	switch fwt {
 	case 6:
 		fwtype = FirmwareEFI32
-	case 7:
+	case 7, 9:
+		// Type 7 and 9 are both x64 EFI variants
 		fwtype = FirmwareEFI64
-	case 9:
-		fwtype = FirmwareEFIBC
-	case 11:
+	case 11, 19:
+		// Type 11 and 19 are both ARM64 EFI variants
 		fwtype = FirmwareARM64EFI
 	default:
 		return 0, fmt.Errorf("unsupported client firmware type '%d'", fwt)
