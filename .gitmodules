@@ -1,3 +1,12 @@
 [submodule "ipxe"]
 	path = third_party/ipxe
 	url = https://github.com/ipxe/ipxe.git
+[submodule "third_party/edk2"]
+	path = third_party/edk2
+	url = https://github.com/tianocore/edk2.git
+[submodule "third_party/edk2-platforms"]
+	path = third_party/edk2-platforms
+	url = https://github.com/tianocore/edk2-platforms.git
+[submodule "third_party/edk2-non-osi"]
+	path = third_party/edk2-non-osi
+	url = https://github.com/tianocore/edk2-non-osi.git

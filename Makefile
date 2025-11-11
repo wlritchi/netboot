@@ -66,3 +66,21 @@ update-ipxe:
 	cp third_party/ipxe/src/bin-x86_64-efi/ipxe.efi ipxe/bin/ipxe-x64.efi
 	cp third_party/ipxe/src/bin-i386-efi/ipxe.efi ipxe/bin/ipxe-i386.efi
 	cp third_party/ipxe/src/bin-arm64-efi/snp.efi ipxe/bin/snp-arm64.efi
+
+.PHONY: update-rpi4
+update-rpi4:
+	# Set up EDK2 build environment
+	cd third_party/edk2 && \
+	. ./edksetup.sh && \
+	$(MAKE) -C BaseTools
+	# Build RPi4 UEFI firmware
+	export GCC_AARCH64_PREFIX=aarch64-linux-gnu- && \
+	export WORKSPACE=$(HERE)/third_party && \
+	export PACKAGES_PATH=$(HERE)/third_party/edk2:$(HERE)/third_party/edk2-platforms:$(HERE)/third_party/edk2-non-osi && \
+	$(if $(SOURCE_DATE_EPOCH),export SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) &&) \
+	cd third_party && \
+	. edk2/edksetup.sh && \
+	build -a AARCH64 -t GCC -p edk2-platforms/Platform/RaspberryPi/RPi4/RPi4.dsc -b RELEASE
+	# Copy built firmware to rpi4/bin
+	mkdir -p rpi4/bin
+	cp third_party/Build/RPi4/RELEASE_GCC/FV/RPI_EFI.fd rpi4/bin/

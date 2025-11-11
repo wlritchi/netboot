@@ -1,12 +1,15 @@
-name: Build iPXE Binaries
+name: Build Binaries
 
 on:
   push:
     branches: [main]
     paths:
       - 'third_party/ipxe/**'
+      - 'third_party/edk2/**'
+      - 'third_party/edk2-platforms/**'
+      - 'third_party/edk2-non-osi/**'
       - 'pixiecore/boot.ipxe'
-      - '.github/workflows/build-ipxe.yml'
+      - '.github/workflows/build-binaries.yml'
   workflow_dispatch:
 
 permissions:
@@ -36,8 +39,22 @@ jobs:
           else
             BUILD_TIMESTAMP=$CONFIG_TIMESTAMP
           fi
-          echo "timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "Using build timestamp: $BUILD_TIMESTAMP"
+          echo "ipxe_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "Using iPXE build timestamp: $BUILD_TIMESTAMP"
+
+          # Calculate EDK2 timestamp from latest submodule commit
+          EDK2_TIMESTAMP=$(git -C third_party/edk2 log -1 --format=%ct)
+          EDK2_PLATFORMS_TIMESTAMP=$(git -C third_party/edk2-platforms log -1 --format=%ct)
+          EDK2_NONOSI_TIMESTAMP=$(git -C third_party/edk2-non-osi log -1 --format=%ct)
+          SOURCE_DATE_EPOCH=$EDK2_TIMESTAMP
+          if [ "$EDK2_PLATFORMS_TIMESTAMP" -gt "$SOURCE_DATE_EPOCH" ]; then
+            SOURCE_DATE_EPOCH=$EDK2_PLATFORMS_TIMESTAMP
+          fi
+          if [ "$EDK2_NONOSI_TIMESTAMP" -gt "$SOURCE_DATE_EPOCH" ]; then
+            SOURCE_DATE_EPOCH=$EDK2_NONOSI_TIMESTAMP
+          fi
+          echo "edk2_timestamp=$SOURCE_DATE_EPOCH" >> $GITHUB_OUTPUT
+          echo "Using EDK2 build timestamp (SOURCE_DATE_EPOCH): $SOURCE_DATE_EPOCH"
 
       - name: Build iPXE binaries
         run: |
@@ -47,12 +64,26 @@ jobs:
             bash -c 'apt-get update && apt-get install -y crossbuild-essential-arm64 && \
               git config --global --add safe.directory /netboot && \
               git config --global --add safe.directory /netboot/third_party/ipxe && \
-              make update-ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}'
+              make update-ipxe BUILD_TIMESTAMP=${{ steps.timestamp.outputs.ipxe_timestamp }}'
           sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/ipxe/bin
+
+      - name: Build RPi4 UEFI firmware
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/netboot -w /netboot \
+            gcc:15 \
+            bash -c 'apt-get update && apt-get install -y python3 python-is-python3 uuid-dev crossbuild-essential-arm64 acpica-tools && \
+              git config --global --add safe.directory /netboot && \
+              git config --global --add safe.directory /netboot/third_party/edk2 && \
+              git config --global --add safe.directory /netboot/third_party/edk2-platforms && \
+              git config --global --add safe.directory /netboot/third_party/edk2-non-osi && \
+              make SOURCE_DATE_EPOCH=${{ steps.timestamp.outputs.edk2_timestamp }} update-rpi4'
+          sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/rpi4/bin
 
       - name: Display checksums
         run: |
           sha256sum ipxe/bin/*
+          sha256sum rpi4/bin/*
 
       - name: Generate SLSA provenance attestation
         uses: actions/attest-build-provenance@v1
@@ -63,6 +94,7 @@ jobs:
             ipxe/bin/ipxe-x64.efi
             ipxe/bin/undionly.kpxe
             ipxe/bin/snp-arm64.efi
+            rpi4/bin/RPI_EFI.fd
 
       - name: Check for changes
         id: check_changes
@@ -70,7 +102,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add ipxe/bin/
+          git add ipxe/bin/ rpi4/bin/
           if git diff --cached --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes detected in built binaries"
@@ -83,10 +115,15 @@ jobs:
       - name: Commit and push changes
         if: steps.check_changes.outputs.changed == 'true'
         run: |
-          git commit -m "Update iPXE binaries
+          git commit -m "Update binaries
 
-          Built with gcc:15 using BUILD_TIMESTAMP=${{ steps.timestamp.outputs.timestamp }}
-          (derived from the later of iPXE submodule commit and boot.ipxe modification time).
+          Built with gcc:15.
+
+          iPXE build timestamp: ${{ steps.timestamp.outputs.ipxe_timestamp }}
+          (from the later of iPXE submodule commit and boot.ipxe modification time)
+
+          EDK2 build timestamp: ${{ steps.timestamp.outputs.edk2_timestamp }}
+          (from the latest submodule commit of EDK2 and its plugins)
 
           Source commit: ${{ github.sha }}
           Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
