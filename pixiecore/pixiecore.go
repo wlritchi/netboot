@@ -154,6 +154,7 @@ const (
 	FirmwareX86Ipxe                       // "Classic" x86 BIOS running iPXE (no UNDI support)
 	FirmwarePixiecoreIpxe                 // Pixiecore's iPXE, which has replaced the underlying firmware
 	FirmwareARM64EFI                      // 64-bit ARM processor running EFI
+	FirmwareRaspberryPi                   // Raspberry Pi bootrom (reports as firmware type 0 but needs special handling)
 )
 
 // A Server boots machines using a Booter.

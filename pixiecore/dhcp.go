@@ -122,6 +122,17 @@ func (s *Server) validateDHCP(pkt *dhcp4.Packet) (mach Machine, fwtype Firmware,
 		return mach, 0, fmt.Errorf("unsupported client firmware type '%d'", fwt)
 	}
 
+	// Detect Raspberry Pi clients via vendor class identifier (option 60).
+	// The Pi bootrom reports as firmware type 0 (BIOS/UNDI) but is actually
+	// an ARM64 device that needs special TFTP-based boot handling.
+	if vendorClass, err := pkt.Options.String(60); err == nil {
+		// Raspberry Pi 4 bootrom sends this specific vendor class
+		if fwt == 0 && vendorClass == "PXEClient:Arch:00000:UNDI:002001" {
+			mach.Arch = ArchARM64
+			fwtype = FirmwareRaspberryPi
+		}
+	}
+
 	// Now, identify special sub-breeds of client firmware based on
 	// the user-class option. Note these only change the "firmware
 	// type", not the architecture we're reporting to Booters. We need
@@ -233,6 +244,30 @@ func (s *Server) offerDHCP(pkt *dhcp4.Packet, mach Machine, serverIP net.IP, fwt
 		// pxe.go).
 		resp.BootServerName = serverIP.String()
 		resp.BootFilename = fmt.Sprintf("%s/%d", mach.MAC, fwtype)
+
+	case FirmwareRaspberryPi:
+		// Raspberry Pi bootrom uses a TFTP-based boot protocol that's
+		// similar to PXE but with some quirks. The Pi needs DHCP options
+		// 66 (TFTP Server) and 67 (Boot File Name) to be explicitly set,
+		// not just the sname/file fields that standard PXE uses.
+		//
+		// The Pi bootrom will request files by name (config.txt,
+		// start4.elf, etc.) rather than using the boot filename we
+		// provide, so the filename here doesn't really matter.
+		pxe := dhcp4.Options{
+			// PXE Boot Server Discovery Control - bypass, just boot from filename.
+			6: []byte{8},
+		}
+		bs, err := pxe.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize PXE vendor options: %s", err)
+		}
+		resp.Options[43] = bs
+		resp.BootServerName = serverIP.String()
+		resp.BootFilename = "config.txt"
+		// Raspberry Pi specifically needs these options set
+		resp.Options[dhcp4.OptTFTPServer] = []byte(serverIP.String())
+		resp.Options[dhcp4.OptBootFile] = []byte(resp.BootFilename)
 
 	case FirmwarePixiecoreIpxe:
 		// We've already gone through one round of chainloading, now
