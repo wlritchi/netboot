@@ -6,3 +6,4 @@ pixiecore/pixiecore.test
 vendor/
 build/
 third_party/Build/
+third_party/rpi-firmware/

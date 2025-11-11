@@ -21,9 +21,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"go.universe.tf/netboot/rpi4"
 	"go.universe.tf/netboot/tftp"
 )
 
@@ -62,7 +64,13 @@ func extractInfo(path string) (net.HardwareAddr, int, error) {
 func (s *Server) logTFTPTransfer(clientAddr net.Addr, path string, err error) {
 	mac, _, pathErr := extractInfo(path)
 	if pathErr != nil {
-		s.log("TFTP", "unable to extract mac from request:%v", pathErr)
+		// Not a Pixiecore path, might be a Raspberry Pi boot file request
+		filename := filepath.Base(path)
+		if err != nil {
+			s.log("TFTP", "Send of %q to %s failed: %s", path, clientAddr, err)
+		} else {
+			s.log("TFTP", "Sent %q to %s", filename, clientAddr)
+		}
 		return
 	}
 	if err != nil {
@@ -74,14 +82,34 @@ func (s *Server) logTFTPTransfer(clientAddr net.Addr, path string, err error) {
 }
 
 func (s *Server) handleTFTP(path string, clientAddr net.Addr) (io.ReadCloser, int64, error) {
+	// Try to parse as Pixiecore path (MAC/firmware_type) first
 	_, i, err := extractInfo(path)
-	if err != nil {
-		return nil, 0, fmt.Errorf("unknown path %q", path)
+	if err == nil {
+		// It's a Pixiecore path, serve iPXE binary
+		bs, ok := s.Ipxe[Firmware(i)]
+		if !ok {
+			return nil, 0, fmt.Errorf("unknown firmware type %d", i)
+		}
+		return ioutil.NopCloser(bytes.NewBuffer(bs)), int64(len(bs)), nil
 	}
 
-	bs, ok := s.Ipxe[Firmware(i)]
+	// Not a Pixiecore path, try serving as Raspberry Pi boot file
+	// The Pi bootrom requests files by name (possibly with a directory prefix)
+	// Strip any directory prefix to get just the filename
+	filename := filepath.Base(path)
+
+	// Special case: Pi UEFI firmware may request bootaa64.efi from efi/boot/ directory
+	// This should be served from the ipxe package as the ARM64 iPXE binary
+	if filename == "bootaa64.efi" {
+		if bs, ok := s.Ipxe[FirmwareARM64EFI]; ok {
+			return ioutil.NopCloser(bytes.NewBuffer(bs)), int64(len(bs)), nil
+		}
+	}
+
+	// Look up the file in the RPi4 embedded files
+	bs, ok := rpi4.Files[filename]
 	if !ok {
-		return nil, 0, fmt.Errorf("unknown firmware type %d", i)
+		return nil, 0, fmt.Errorf("unknown file %q", filename)
 	}
 
 	return ioutil.NopCloser(bytes.NewBuffer(bs)), int64(len(bs)), nil
