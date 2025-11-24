@@ -107,3 +107,10 @@ func (s *Server) debugPacket(subsystem string, layer int, packet []byte) {
 	}
 	s.Debug(subsystem, fmt.Sprintf("PKT %d %s END", layer, base64.StdEncoding.EncodeToString(packet)))
 }
+
+// logBootStage logs a boot flow stage transition with firmware type and next expected stage.
+func (s *Server) logBootStage(subsystem string, mac net.HardwareAddr, fwtype Firmware, state machineState, action string) {
+	nextStage := fwtype.NextStage(state)
+	s.log(subsystem, "%s %s (%s) %s, %s", action, mac, fwtype, state.String(), nextStage)
+	s.machineEvent(mac, state, "%s, %s", state.String(), nextStage)
+}

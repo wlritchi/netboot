@@ -109,9 +109,8 @@ func (s *Server) handleIpxe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.log("HTTP", "Sending ipxe boot script to %s", r.RemoteAddr)
 	start = time.Now()
-	s.machineEvent(mac, machineStateIpxeScript, "Sent iPXE boot script")
+	s.logBootStage("HTTP", mac, FirmwarePixiecoreIpxe, machineStateIpxeScript, "Sending boot script to")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(script)
 	s.debug("HTTP", "Writing ipxe script to %s took %s", mac, time.Since(start))
@@ -150,14 +149,14 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 			s.log("HTTP", "File fetch provided invalid MAC address %q", r.URL.Query().Get("mac"))
 			return
 		}
-		s.machineEvent(mac, machineStateKernel, "Sent kernel %q", name)
+		s.logBootStage("HTTP", mac, FirmwarePixiecoreIpxe, machineStateKernel, fmt.Sprintf("Sent kernel %q to", name))
 	case "initrd":
 		mac, err := net.ParseMAC(r.URL.Query().Get("mac"))
 		if err != nil {
 			s.log("HTTP", "File fetch provided invalid MAC address %q", r.URL.Query().Get("mac"))
 			return
 		}
-		s.machineEvent(mac, machineStateInitrd, "Sent initrd %q", name)
+		s.logBootStage("HTTP", mac, FirmwarePixiecoreIpxe, machineStateInitrd, fmt.Sprintf("Sent initrd %q to", name))
 	}
 }
 
@@ -177,7 +176,7 @@ func (s *Server) handleBooting(w http.ResponseWriter, r *http.Request) {
 		s.debug("HTTP", "Bad request %q from %s, invalid MAC address %q (%s)", r.URL, r.RemoteAddr, macStr, err)
 		return
 	}
-	s.machineEvent(mac, machineStateBooted, "Booting into OS")
+	s.logBootStage("HTTP", mac, FirmwarePixiecoreIpxe, machineStateBooted, "Client")
 }
 
 func ipxeScript(mach Machine, spec *Spec, serverHost string) ([]byte, error) {

@@ -156,6 +156,74 @@ const (
 	FirmwareRaspberryPi                   // Raspberry Pi bootrom (reports as firmware type 0 but needs special handling)
 )
 
+func (f Firmware) String() string {
+	switch f {
+	case FirmwareX86PC:
+		return "X86 BIOS PXE"
+	case FirmwareEFI32:
+		return "IA32 UEFI"
+	case FirmwareEFI64:
+		return "X64 UEFI"
+	case FirmwareX86Ipxe:
+		return "X86 Native iPXE"
+	case FirmwarePixiecoreIpxe:
+		return "Pixiecore iPXE"
+	case FirmwareARM64EFI:
+		return "ARM64 UEFI"
+	case FirmwareRaspberryPi:
+		return "Raspberry Pi 4"
+	default:
+		return "Unknown firmware"
+	}
+}
+
+// NextStage returns a human-readable description of the next expected stage
+// in the boot flow based on the firmware type and current state.
+func (f Firmware) NextStage(state machineState) string {
+	switch state {
+	case machineStateProxyDHCP:
+		// Just made initial DHCP offer
+		switch f {
+		case FirmwareX86PC:
+			return "expecting TFTP query for iPXE binary"
+		case FirmwareEFI32, FirmwareEFI64, FirmwareARM64EFI:
+			return "expecting PXE/BINL request on port 4011"
+		case FirmwareX86Ipxe:
+			return "expecting TFTP query for iPXE binary"
+		case FirmwareRaspberryPi:
+			return "expecting TFTP queries for Pi firmware files"
+		default:
+			return "expecting next stage"
+		}
+	case machineStatePXE:
+		// Just sent PXE/BINL response (UEFI only)
+		return "expecting TFTP query for iPXE binary"
+	case machineStateTFTP:
+		// Just sent iPXE binary or Pi firmware
+		if f == FirmwareRaspberryPi {
+			return "expecting Pi UEFI boot, then iPXE DHCP request"
+		}
+		return "expecting iPXE to reconnect via DHCP"
+	case machineStateProxyDHCPIpxe:
+		// Just made iPXE DHCP offer with HTTP URL
+		return "expecting HTTP request for boot script"
+	case machineStateIpxeScript:
+		// Just sent boot script
+		return "expecting HTTP requests for kernel and initrd"
+	case machineStateKernel:
+		// Just sent kernel
+		return "expecting HTTP request for initrd"
+	case machineStateInitrd:
+		// Just sent initrd
+		return "expecting final boot"
+	case machineStateBooted:
+		// Client reached final boot stage
+		return "boot complete"
+	default:
+		return "unknown next stage"
+	}
+}
+
 // A Server boots machines using a Booter.
 type Server struct {
 	Booter Booter

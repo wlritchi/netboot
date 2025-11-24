@@ -69,7 +69,7 @@ func (s *Server) servePXE(conn net.PacketConn) error {
 			continue
 		}
 
-		s.machineEvent(pkt.HardwareAddr, machineStatePXE, "Sent PXE configuration")
+		s.logBootStage("PXE", pkt.HardwareAddr, fwtype, machineStatePXE, "Client")
 
 		resp, err := s.offerPXE(pkt, serverIP, fwtype)
 		if err != nil {

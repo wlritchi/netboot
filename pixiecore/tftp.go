@@ -62,22 +62,27 @@ func extractInfo(path string) (net.HardwareAddr, int, error) {
 }
 
 func (s *Server) logTFTPTransfer(clientAddr net.Addr, path string, err error) {
-	mac, _, pathErr := extractInfo(path)
+	mac, fwtypeInt, pathErr := extractInfo(path)
 	if pathErr != nil {
 		// Not a Pixiecore path, might be a Raspberry Pi boot file request
 		filename := filepath.Base(path)
 		if err != nil {
 			s.log("TFTP", "Send of %q to %s failed: %s", path, clientAddr, err)
 		} else {
-			s.log("TFTP", "Sent %q to %s", filename, clientAddr)
+			// For Pi firmware files, assume Raspberry Pi firmware type
+			if filename == "config.txt" || filename == "start4.elf" || filename == "bootcode.bin" {
+				s.log("TFTP", "Sent Pi firmware file %q to %s", filename, clientAddr)
+			} else {
+				s.log("TFTP", "Sent %q to %s", filename, clientAddr)
+			}
 		}
 		return
 	}
 	if err != nil {
 		s.log("TFTP", "Send of %q to %s failed: %s", path, clientAddr, err)
 	} else {
-		s.log("TFTP", "Sent %q to %s", path, clientAddr)
-		s.machineEvent(mac, machineStateTFTP, "Sent iPXE to %s", clientAddr)
+		fwtype := Firmware(fwtypeInt)
+		s.logBootStage("TFTP", mac, fwtype, machineStateTFTP, "Sent iPXE binary to")
 	}
 }
 
