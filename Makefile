@@ -6,6 +6,44 @@ HERE := $(patsubst %/,%,$(dir $(THIS)))
 GOCMD:=go
 GOMODULECMD:=GO111MODULE=on go
 
+# Docker image for cross-compilation builds
+DOCKER_IMAGE ?= gcc:15
+
+# Reproducible build timestamps
+#
+# These are calculated from git commit timestamps to ensure reproducible builds.
+# Override with explicit values if needed (e.g., BUILD_TIMESTAMP=1234567890).
+
+# iPXE timestamp: later of iPXE submodule commit or boot.ipxe modification
+IPXE_SUBMODULE_TIMESTAMP := $(shell git -C third_party/ipxe log -1 --format=%ct 2>/dev/null || echo 0)
+BOOT_IPXE_TIMESTAMP := $(shell git log -1 --format=%ct -- pixiecore/boot.ipxe 2>/dev/null || echo 0)
+IPXE_BUILD_TIMESTAMP := $(shell \
+	if [ $(IPXE_SUBMODULE_TIMESTAMP) -gt $(BOOT_IPXE_TIMESTAMP) ]; then \
+		echo $(IPXE_SUBMODULE_TIMESTAMP); \
+	else \
+		echo $(BOOT_IPXE_TIMESTAMP); \
+	fi)
+
+# EDK2 timestamp: latest of edk2, edk2-platforms, and edk2-non-osi submodule commits
+EDK2_TIMESTAMP := $(shell git -C third_party/edk2 log -1 --format=%ct 2>/dev/null || echo 0)
+EDK2_PLATFORMS_TIMESTAMP := $(shell git -C third_party/edk2-platforms log -1 --format=%ct 2>/dev/null || echo 0)
+EDK2_NONOSI_TIMESTAMP := $(shell git -C third_party/edk2-non-osi log -1 --format=%ct 2>/dev/null || echo 0)
+EDK2_SOURCE_DATE_EPOCH := $(shell \
+	max=$(EDK2_TIMESTAMP); \
+	if [ $(EDK2_PLATFORMS_TIMESTAMP) -gt $$max ]; then max=$(EDK2_PLATFORMS_TIMESTAMP); fi; \
+	if [ $(EDK2_NONOSI_TIMESTAMP) -gt $$max ]; then max=$(EDK2_NONOSI_TIMESTAMP); fi; \
+	echo $$max)
+
+# Allow overriding via command line or environment
+BUILD_TIMESTAMP ?= $(IPXE_BUILD_TIMESTAMP)
+SOURCE_DATE_EPOCH ?= $(EDK2_SOURCE_DATE_EPOCH)
+
+# Print calculated timestamps (useful for CI to capture for commit messages)
+.PHONY: print-timestamps
+print-timestamps:
+	@echo "BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)"
+	@echo "SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)"
+
 # Local customizations to the above.
 ifneq ($(wildcard Makefile.defaults),)
 include Makefile.defaults
@@ -13,6 +51,26 @@ endif
 
 all:
 	$(error Please request a specific thing, there is no default target)
+
+# Clean build artifacts
+.PHONY: clean
+clean:
+	@echo "Cleaning EDK2 BaseTools..."
+	-$(MAKE) -C third_party/edk2/BaseTools clean 2>/dev/null || true
+	@echo "Cleaning iPXE build artifacts..."
+	-$(MAKE) -C third_party/ipxe/src clean 2>/dev/null || true
+	@echo "Cleaning EDK2 Build directory..."
+	rm -rf third_party/Build
+	@echo "Clean complete."
+
+.PHONY: clean-ipxe
+clean-ipxe:
+	-$(MAKE) -C third_party/ipxe/src clean 2>/dev/null || true
+
+.PHONY: clean-edk2
+clean-edk2:
+	-$(MAKE) -C third_party/edk2/BaseTools clean 2>/dev/null || true
+	rm -rf third_party/Build
 
 .PHONY: ci-prepare
 ci-prepare:
@@ -46,7 +104,7 @@ ci-push-images:
 ci-config:
 	(cd .circleci && go run gen-config.go >config.yml)
 
-IPXE_BUILD_ARGS = EMBED=$(HERE)/pixiecore/boot.ipxe $(if $(BUILD_TIMESTAMP),BUILD_TIMESTAMP=$(BUILD_TIMESTAMP))
+IPXE_BUILD_ARGS = EMBED=$(HERE)/pixiecore/boot.ipxe BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)
 
 .PHONY: update-ipxe
 update-ipxe:
@@ -115,7 +173,7 @@ update-rpi4:
 	export GCC_AARCH64_PREFIX=aarch64-linux-gnu- && \
 	export WORKSPACE=$(HERE)/third_party && \
 	export PACKAGES_PATH=$(HERE)/third_party/edk2:$(HERE)/third_party/edk2-platforms:$(HERE)/third_party/edk2-non-osi && \
-	$(if $(SOURCE_DATE_EPOCH),export SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) &&) \
+	export SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) && \
 	cd third_party && \
 	. edk2/edksetup.sh && \
 	build -a AARCH64 -t GCC -p edk2-platforms/Platform/RaspberryPi/RPi4/RPi4.dsc -b RELEASE
@@ -123,3 +181,57 @@ update-rpi4:
 	mkdir -p rpi4/bin
 	cp third_party/Build/RPi4/RELEASE_GCC/FV/RPI_EFI.fd rpi4/bin/
 	@echo "UEFI firmware build complete."
+
+# Docker-based build targets
+#
+# These targets run the builds inside a Docker container for reproducibility.
+# They handle:
+# - Installing cross-compilation toolchains
+# - Configuring git safe directories
+# - Cleaning stale build artifacts that may have host-specific paths
+# - Running the actual build
+# - Fixing file ownership after the build
+#
+# Use BUILD_TIMESTAMP and SOURCE_DATE_EPOCH for reproducible builds.
+
+DOCKER_RUN = docker run --rm -v $(HERE):/netboot -w /netboot $(DOCKER_IMAGE)
+DOCKER_GIT_SAFE_DIRS = \
+	git config --global --add safe.directory /netboot && \
+	git config --global --add safe.directory /netboot/third_party/ipxe && \
+	git config --global --add safe.directory /netboot/third_party/edk2 && \
+	git config --global --add safe.directory /netboot/third_party/edk2-platforms && \
+	git config --global --add safe.directory /netboot/third_party/edk2-non-osi
+
+.PHONY: docker-update-ipxe
+docker-update-ipxe:
+	@echo "Using BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)"
+	$(DOCKER_RUN) bash -c '\
+		apt-get update && apt-get install -y crossbuild-essential-arm64 && \
+		$(DOCKER_GIT_SAFE_DIRS) && \
+		$(MAKE) clean-ipxe && \
+		$(MAKE) update-ipxe BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)'
+	@echo "Fixing file ownership..."
+	@if [ -n "$$SUDO_UID" ]; then \
+		chown -R $$SUDO_UID:$$SUDO_GID $(HERE)/ipxe/bin $(HERE)/third_party/ipxe/src; \
+	elif [ $$(id -u) -eq 0 ]; then \
+		echo "Warning: Running as root without SUDO_UID set, skipping chown"; \
+	fi
+
+.PHONY: docker-update-rpi4
+docker-update-rpi4:
+	@echo "Using SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)"
+	$(DOCKER_RUN) bash -c '\
+		apt-get update && apt-get install -y python3 python-is-python3 uuid-dev crossbuild-essential-arm64 acpica-tools && \
+		$(DOCKER_GIT_SAFE_DIRS) && \
+		$(MAKE) clean-edk2 && \
+		$(MAKE) update-rpi4 SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)'
+	@echo "Fixing file ownership..."
+	@if [ -n "$$SUDO_UID" ]; then \
+		chown -R $$SUDO_UID:$$SUDO_GID $(HERE)/rpi4/bin $(HERE)/third_party/Build $(HERE)/third_party/edk2/BaseTools; \
+	elif [ $$(id -u) -eq 0 ]; then \
+		echo "Warning: Running as root without SUDO_UID set, skipping chown"; \
+	fi
+
+.PHONY: docker-clean
+docker-clean:
+	$(DOCKER_RUN) $(MAKE) clean
