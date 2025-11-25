@@ -12,3 +12,8 @@ enable_uart=1
 
 # No boot delay
 boot_delay=0
+
+# Tell GPU firmware where to place the device tree blob
+# Must match PcdFdtBaseAddress in EDK2 (0x003e0000)
+device_tree_address=0x3e0000
+device_tree_end=0x400000
