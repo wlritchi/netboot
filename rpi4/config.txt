@@ -7,8 +7,14 @@ arm_64bit=1
 # Use RPI_EFI.fd as the UEFI firmware stub
 armstub=RPI_EFI.fd
 
-# Enable UART for debugging (optional)
+# Enable UART for debugging
 enable_uart=1
+
+# Enable GIC (Generic Interrupt Controller)
+enable_gic=1
+
+# Disable GPU kernel command line tags (required for UEFI)
+disable_commandline_tags=2
 
 # No boot delay
 boot_delay=0

@@ -163,8 +163,20 @@ update-rpi4-firmware:
 #
 # This is independent of the Pi firmware files (start4.elf, etc.) - those are
 # updated separately via update-rpi4-firmware.
+#
+# Local patches from patches/ are applied before building to customize the
+# firmware for network boot scenarios (e.g., enabling DeviceTree by default).
 .PHONY: update-rpi4
 update-rpi4:
+	@echo "Applying local patches to EDK2..."
+	@for patch in $(HERE)/patches/*.patch; do \
+		if [ -f "$$patch" ]; then \
+			echo "Applying $$patch..."; \
+			git -C $(HERE)/third_party/edk2-platforms apply "$$patch" --check 2>/dev/null && \
+			git -C $(HERE)/third_party/edk2-platforms apply "$$patch" || \
+			echo "Patch already applied or not applicable: $$patch"; \
+		fi; \
+	done
 	@echo "Building EDK2 BaseTools..."
 	cd third_party/edk2 && \
 	. ./edksetup.sh && \
@@ -180,6 +192,8 @@ update-rpi4:
 	@echo "Copying UEFI firmware to rpi4/bin/..."
 	mkdir -p rpi4/bin
 	cp third_party/Build/RPi4/RELEASE_GCC/FV/RPI_EFI.fd rpi4/bin/
+	@echo "Restoring patched vendor sources..."
+	git -C $(HERE)/third_party/edk2-platforms restore .
 	@echo "UEFI firmware build complete."
 
 # Docker-based build targets

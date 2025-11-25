@@ -10,6 +10,7 @@ on:
       - 'third_party/edk2-non-osi/**'
       - 'pixiecore/boot.ipxe'
       - 'Makefile'
+      - 'patches/**'
       - '.github/workflows/build-binaries.yml'
   workflow_dispatch:
 
